@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://licencia-tma-1.vercel.app/sitemap.xml
+Sitemap: https://examen-licencia-tma-1.vercel.app/sitemap.xml
