@@ -271,6 +271,9 @@ function renderHome(){
           <div id="timeChips" class="flex flex-wrap gap-2"></div>
         </div>
       </div>
+      <div class="mt-5 pt-4" style="border-top:1px solid var(--border)">
+        <button id="resetDataBtn" class="text-xs font-medium" style="color:var(--danger)">Eliminar mis datos (racha, XP y progreso)</button>
+      </div>
     </section>
 
     <div class="sticky bottom-4">
@@ -334,6 +337,13 @@ function renderHome(){
   };
   document.getElementById('selAll').onclick = ()=>{ state.selectedSubjects = new Set(MAT_KEYS); renderHome(); };
   document.getElementById('selNone').onclick = ()=>{ state.selectedSubjects = new Set(); renderHome(); };
+  document.getElementById('resetDataBtn').onclick = ()=>{
+    if(confirm('Esto borrará tu racha, XP y progreso por materia guardados en este dispositivo. ¿Continuar?')){
+      try{ localStorage.removeItem(STORE_KEY); }catch(e){}
+      stats = { xp:0, streak:0, lastDate:null, subjectStats:{}, theme: stats.theme };
+      renderHome();
+    }
+  };
   document.getElementById('startBtn').onclick = startSession;
 }
 
@@ -397,7 +407,7 @@ function renderLesson(){
   const q = sess.questions[sess.index];
   const total = sess.questions.length;
 
-  const segs = sess.questions.map((_,i)=>`<div class="gauge-seg h-1.5 rounded-full flex-1 ${i<sess.index? 'filled': (i===sess.index?'filled':'')}"></div>`).join('');
+  const segs = sess.questions.map((_,i)=>`<div class="gauge-seg h-1.5 rounded-full flex-1 ${(i<sess.index || sess.answers[i])? 'filled':''}"></div>`).join('');
 
   app.innerHTML = `
   <div class="max-w-2xl w-full mx-auto px-5 pt-5 flex flex-col flex-1">
@@ -412,8 +422,6 @@ function renderLesson(){
     </div>
 
     <div id="qArea" class="flex-1"></div>
-
-    <div id="feedbackBar"></div>
   </div>`;
 
   document.getElementById('quitBtn').onclick = ()=>{
@@ -438,23 +446,25 @@ function renderQuestionArea(){
     bodyHtml += `<div id="optList" class="flex flex-col gap-2.5 mb-4">` + q.optsArr.map(([k,v])=>
       `<button class="opt w-full text-left rounded-xl px-4 py-3 flex gap-3 text-sm" data-k="${k}">
         <span class="font-mono font-semibold" style="color:var(--muted)">${k}</span><span>${esc(v)}</span>
-      </button>`).join('') + `</div>
-      <button id="checkBtn" class="btn-accent w-full rounded-xl py-3 font-semibold disabled:opacity-40" disabled>Comprobar</button>`;
+      </button>`).join('') + `</div>`;
   } else if(state.mode==='complete'){
     const correctText = q.opciones[q.respuesta_correcta] || '';
     const display = correctText.split(new RegExp('('+q.cloze.word.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+')','i'))
       .map(part=> part.toUpperCase()===q.cloze.word.toUpperCase() ? '<span class="font-mono px-1 border-b-2" style="border-color:var(--accent)">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span>' : esc(part)).join('');
     bodyHtml += `<div class="card rounded-xl p-4 mb-5 text-sm leading-relaxed" style="color:var(--muted)">Completa la palabra clave de la respuesta correcta:<br><span class="text-base" style="color:var(--text)">${display}</span></div>
-      <input id="answerInput" autocomplete="off" class="w-full card rounded-xl px-4 py-3 text-base font-mono mb-4" placeholder="Escribe la palabra que falta…">
-      <button id="checkBtn" class="btn-accent w-full rounded-xl py-3 font-semibold disabled:opacity-40" disabled>Comprobar</button>`;
+      <input id="answerInput" autocomplete="off" class="w-full card rounded-xl px-4 py-3 text-base font-mono mb-4" placeholder="Escribe la palabra que falta…">`;
   } else {
     bodyHtml += `<div class="text-xs mb-2" style="color:var(--muted)">Escribe la respuesta completa (o la letra A, B, C, D):</div>
-      <input id="answerInput" autocomplete="off" class="w-full card rounded-xl px-4 py-3 text-base mb-4" placeholder="Tu respuesta…">
-      <button id="checkBtn" class="btn-accent w-full rounded-xl py-3 font-semibold disabled:opacity-40" disabled>Comprobar</button>`;
+      <input id="answerInput" autocomplete="off" class="w-full card rounded-xl px-4 py-3 text-base mb-4" placeholder="Tu respuesta…">`;
   }
+
+  bodyHtml += `<button id="actionBtn" data-phase="check" class="btn-accent w-full rounded-xl py-3 font-semibold disabled:opacity-40" disabled>Comprobar</button>
+    <div id="feedbackMsg" class="mt-4"></div>`;
 
   qArea.innerHTML = bodyHtml;
   qArea.classList.add('fade-in');
+
+  const actionBtn = document.getElementById('actionBtn');
 
   if(state.mode==='select'){
     document.querySelectorAll('#optList .opt').forEach(btn=>{
@@ -464,21 +474,17 @@ function renderQuestionArea(){
         btn.style.borderColor = 'var(--accent)';
         sess.pendingChoice = btn.dataset.k;
         document.querySelectorAll('#optList .opt').forEach(o=>{ o.style.borderColor = o===btn?'var(--accent)':''; });
-        const cb = document.getElementById('checkBtn');
-        cb.disabled = false;
+        actionBtn.disabled = false;
       };
     });
-    document.getElementById('checkBtn').onclick = submitAnswer;
   } else {
     const input = document.getElementById('answerInput');
-    const cb = document.getElementById('checkBtn');
     input.focus();
-    input.oninput = ()=>{ cb.disabled = input.value.trim().length===0; };
-    input.onkeydown = (e)=>{ if(e.key==='Enter' && !cb.disabled) submitAnswer(); };
-    cb.onclick = submitAnswer;
+    input.oninput = ()=>{ actionBtn.disabled = input.value.trim().length===0; };
+    input.onkeydown = (e)=>{ if(e.key==='Enter' && !actionBtn.disabled) actionBtn.onclick(); };
   }
 
-  renderFeedbackBar(null);
+  actionBtn.onclick = submitAnswer;
 }
 
 function submitAnswer(){
@@ -496,8 +502,6 @@ function submitAnswer(){
       else if(o.dataset.k===sess.pendingChoice) o.classList.add('wrong');
       o.style.pointerEvents='none';
     });
-    const cbSel = document.getElementById('checkBtn');
-    if(cbSel) cbSel.disabled = true;
   } else {
     const val = document.getElementById('answerInput').value.trim();
     userDisplay = val;
@@ -509,8 +513,6 @@ function submitAnswer(){
       isCorrect = similarity(val, q.cloze.word) >= 0.6 || normalize(val)===normalize(q.cloze.word);
     }
     document.getElementById('answerInput').disabled = true;
-    const cb = document.getElementById('checkBtn');
-    if(cb) cb.disabled = true;
   }
 
   sess.answeredCurrent = true;
@@ -523,30 +525,31 @@ function submitAnswer(){
   const segEls = document.querySelectorAll('.gauge-seg');
   if(segEls[sess.index]) segEls[sess.index].classList.add('filled');
 
-  renderFeedbackBar(isCorrect, q);
+  renderFeedback(isCorrect, q);
 }
 
-function renderFeedbackBar(isCorrect, q){
-  const bar = document.getElementById('feedbackBar');
-  if(isCorrect===null){ bar.innerHTML=''; return; }
-  const last = isCorrect!==undefined;
+function renderFeedback(isCorrect, q){
+  const msg = document.getElementById('feedbackMsg');
   const correctText = q ? (q.opciones[q.respuesta_correcta]||'') : '';
-  bar.innerHTML = `
-    <div class="slide-up fixed left-0 right-0 bottom-0 border-t p-4 sm:p-5 ${isCorrect?'':'shake'}"
-      style="background:${isCorrect?'var(--accentSoft)':'color-mix(in srgb, var(--danger) 12%, var(--surface))'}; border-color:var(--border)">
-      <div class="max-w-2xl mx-auto">
-        <div class="flex items-center gap-2 font-semibold text-sm" style="color:${isCorrect?'var(--accent)':'var(--danger)'}">
-          <span class="pop">${isCorrect?ICON.check:ICON.x}</span>
-          ${isCorrect? '¡Correcto! +10 XP' : 'Incorrecto'}
-        </div>
-        ${!isCorrect ? `<div class="text-sm mt-1" style="color:var(--muted)">Respuesta correcta: <b style="color:var(--text)">${q.respuesta_correcta}</b> — ${esc(correctText)}</div>` : ''}
-        <button id="continueBtn" disabled class="w-full rounded-xl py-3 font-semibold mt-3 disabled:opacity-50" style="background:var(--text);color:var(--bg)">Continuar →</button>
+  msg.innerHTML = `
+    <div class="rounded-xl p-3 sm:p-4 ${isCorrect?'':'shake'}"
+      style="background:${isCorrect?'var(--accentSoft)':'color-mix(in srgb, var(--danger) 12%, var(--surface))'}">
+      <div class="flex items-center gap-2 font-semibold text-sm" style="color:${isCorrect?'var(--accent)':'var(--danger)'}">
+        <span class="pop">${isCorrect?ICON.check:ICON.x}</span>
+        ${isCorrect? '¡Correcto! +10 XP' : 'Incorrecto'}
       </div>
+      ${!isCorrect ? `<div class="text-sm mt-1" style="color:var(--muted)">Respuesta correcta: <b style="color:var(--text)">${q.respuesta_correcta}</b> — ${esc(correctText)}</div>` : ''}
     </div>`;
-  const contBtn = document.getElementById('continueBtn');
-  contBtn.onclick = nextQuestion;
+
+  const actionBtn = document.getElementById('actionBtn');
+  actionBtn.disabled = true;
+  actionBtn.dataset.phase = 'continue';
+  actionBtn.classList.remove('btn-accent');
+  actionBtn.style.background = 'var(--text)';
+  actionBtn.style.color = 'var(--bg)';
+  actionBtn.textContent = 'Continuar →';
   // pequeño retraso para evitar que un doble toque sobre "Comprobar" active "Continuar" por error
-  setTimeout(()=>{ contBtn.disabled = false; contBtn.focus(); }, 350);
+  setTimeout(()=>{ actionBtn.disabled = false; actionBtn.onclick = nextQuestion; actionBtn.focus(); }, 350);
 }
 
 function nextQuestion(){
