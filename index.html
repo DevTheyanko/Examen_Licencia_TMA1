@@ -235,12 +235,15 @@ function renderHome(){
     </section>
 
     <section class="mb-6">
-      <div class="flex items-center justify-between mb-3">
+      <div class="flex items-center justify-between mb-1">
         <h2 class="font-display text-lg font-semibold">Elige tus materias</h2>
         <div class="flex gap-2 text-xs">
           <button id="selAll" class="btn-outline px-2.5 py-1 rounded">Todas</button>
           <button id="selNone" class="btn-outline px-2.5 py-1 rounded">Ninguna</button>
         </div>
+      </div>
+      <div class="text-xs font-mono mb-3" style="color:var(--muted)">
+        ${state.selectedSubjects.size} de ${MAT_KEYS.length} materias · ${totalSelected} preguntas disponibles
       </div>
       <div id="subjGrid" class="grid grid-cols-2 sm:grid-cols-4 gap-2.5"></div>
     </section>
@@ -291,11 +294,12 @@ function renderHome(){
     const pct = s.total ? Math.round(s.correct/s.total*100) : 0;
     const active = state.selectedSubjects.has(key);
     const div = document.createElement('button');
-    div.className = 'subj-card rounded-xl p-3 text-left flex flex-col gap-2' + (active?' active':'');
+    div.className = 'subj-card rounded-xl p-3 text-left flex flex-col gap-2 relative' + (active?' active':'');
     div.innerHTML = `
+      ${active ? `<div class="absolute top-2 right-2 w-4 h-4 rounded-full flex items-center justify-center" style="background:var(--accent);color:var(--bg)">${ICON.check}</div>` : ''}
       <div class="flex items-start justify-between">
         <span class="text-2xl leading-none">${m.icon}</span>
-        ${subjectRingSvg(pct,30)}
+        ${!active ? subjectRingSvg(pct,30) : ''}
       </div>
       <div>
         <div class="text-sm font-medium leading-tight">${m.label}</div>
@@ -406,19 +410,22 @@ function renderLesson(){
   const sess = state.session;
   const q = sess.questions[sess.index];
   const total = sess.questions.length;
-
-  const segs = sess.questions.map((_,i)=>`<div class="gauge-seg h-1.5 rounded-full flex-1 ${(i<sess.index || sess.answers[i])? 'filled':''}"></div>`).join('');
+  const answeredCount = sess.questions.reduce((n,_,i)=> n + (sess.answers[i] ? 1 : 0), 0);
+  const pct = Math.round((answeredCount / total) * 100);
 
   app.innerHTML = `
   <div class="max-w-2xl w-full mx-auto px-5 pt-5 flex flex-col flex-1">
-    <div class="flex items-center gap-3 mb-5">
+    <div class="flex items-center gap-3 mb-2">
       <button id="quitBtn" class="btn-outline w-9 h-9 rounded-full flex items-center justify-center shrink-0">${ICON.x}</button>
-      <div class="flex-1 flex gap-1.5">${segs}</div>
+      <div class="flex-1">
+        <div class="progress-track h-2 rounded-full overflow-hidden"><div class="progress-fill h-full" style="width:${pct}%"></div></div>
+      </div>
+      <div class="text-xs font-mono shrink-0" style="color:var(--muted)">${sess.index+1}/${total}</div>
     </div>
     ${state.timeLimit>0 ? `<div class="text-right font-mono text-xs mb-2" id="lessonClock" style="color:var(--muted)">${fmtClock(sess.timeLeft)}</div>` : ''}
 
     <div class="tag inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] mb-4 w-fit">
-      <span>${MAT[q.materia].icon}</span><span>${MAT[q.materia].label}</span>
+      <span>${MAT[q.materia].icon}</span><span>${MAT[q.materia].label} · Pregunta ${q.nro} de ${BANK[q.materia].length}</span>
     </div>
 
     <div id="qArea" class="flex-1"></div>
@@ -521,9 +528,6 @@ function submitAnswer(){
   else { addSubjectResult(q.materia, false); }
   stats.xp = (stats.xp||0) + (isCorrect?10:0);
   saveStats(stats);
-
-  const segEls = document.querySelectorAll('.gauge-seg');
-  if(segEls[sess.index]) segEls[sess.index].classList.add('filled');
 
   renderFeedback(isCorrect, q);
 }
