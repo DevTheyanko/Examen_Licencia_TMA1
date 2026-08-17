@@ -7,7 +7,6 @@
 <meta name="description" content="Simulador de práctica no oficial para el examen TMA-I (Técnico en Mantenimiento de Aeronaves I). Más de 970 preguntas de aerodinámica, electricidad, física, matemáticas, mecánica y regulaciones venezolanas. Selección simple, completar y escribir respuesta.">
 <meta name="keywords" content="TMA-I, examen TMA, mecanico aviacion Venezuela, simulador TMA, tecnico mantenimiento aeronaves, licencia TMA, INAC, aerodinamica examen, preguntas TMA I">
 <meta name="robots" content="index, follow">
-<meta name="google-site-verification" content="EJWK2HzGCRVM6Xzog-CmbrOzNgQ3yauu_tWcSEf-z9Q" />
 <link rel="canonical" href="https://examen-licencia-tma-1.vercel.app/">
 <meta property="og:type" content="website">
 <meta property="og:title" content="Simulador TMA-I - Práctica no oficial para el examen">
@@ -187,7 +186,6 @@ const ICON = {
   sun:`<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>`,
   moon:`<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>`,
   flame:`<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2c1 3-3 4-3 8a5 5 0 0 0 10 0c0-2-1-3-1-3s.5 2-1 3c0-3-2-4-2-6 0 2-2 3-2 5-1-1-1-4-1-7z"/></svg>`,
-  heart:(filled)=>`<svg width="20" height="20" viewBox="0 0 24 24" fill="${filled?'var(--danger)':'none'}" stroke="var(--danger)" stroke-width="2" class="${filled?'':'heart-empty'}"><path d="M12 20s-7-4.35-9.5-8.5C.7 8 2 4.5 5.5 4c2-.3 3.7.8 4.5 2.2C10.8 4.8 12.5 3.7 14.5 4c3.5.5 4.8 4 3 7.5C19 15.65 12 20 12 20z"/></svg>`,
   x:`<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>`,
   check:`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>`
 };
@@ -372,7 +370,7 @@ function startSession(){
   });
 
   state.session = {
-    questions, index:0, hearts:5, xp:0, correct:0,
+    questions, index:0, xp:0, correct:0,
     answers:{}, startedAt: Date.now(),
     timeLeft: state.timeLimit>0 ? state.timeLimit*60 : 0,
     timer:null, answeredCurrent:false
@@ -406,9 +404,6 @@ function renderLesson(){
     <div class="flex items-center gap-3 mb-5">
       <button id="quitBtn" class="btn-outline w-9 h-9 rounded-full flex items-center justify-center shrink-0">${ICON.x}</button>
       <div class="flex-1 flex gap-1.5">${segs}</div>
-      <div class="flex items-center gap-2 shrink-0">
-        ${[0,1,2,3,4].map(i=>ICON.heart(i<sess.hearts)).join('')}
-      </div>
     </div>
     ${state.timeLimit>0 ? `<div class="text-right font-mono text-xs mb-2" id="lessonClock" style="color:var(--muted)">${fmtClock(sess.timeLeft)}</div>` : ''}
 
@@ -450,10 +445,12 @@ function renderQuestionArea(){
     const display = correctText.split(new RegExp('('+q.cloze.word.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+')','i'))
       .map(part=> part.toUpperCase()===q.cloze.word.toUpperCase() ? '<span class="font-mono px-1 border-b-2" style="border-color:var(--accent)">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span>' : esc(part)).join('');
     bodyHtml += `<div class="card rounded-xl p-4 mb-5 text-sm leading-relaxed" style="color:var(--muted)">Completa la palabra clave de la respuesta correcta:<br><span class="text-base" style="color:var(--text)">${display}</span></div>
-      <input id="answerInput" autocomplete="off" class="w-full card rounded-xl px-4 py-3 text-base font-mono" placeholder="Escribe la palabra que falta…">`;
+      <input id="answerInput" autocomplete="off" class="w-full card rounded-xl px-4 py-3 text-base font-mono mb-4" placeholder="Escribe la palabra que falta…">
+      <button id="checkBtn" class="btn-accent w-full rounded-xl py-3 font-semibold disabled:opacity-40" disabled>Comprobar</button>`;
   } else {
     bodyHtml += `<div class="text-xs mb-2" style="color:var(--muted)">Escribe la respuesta completa (o la letra A, B, C, D):</div>
-      <input id="answerInput" autocomplete="off" class="w-full card rounded-xl px-4 py-3 text-base" placeholder="Tu respuesta…">`;
+      <input id="answerInput" autocomplete="off" class="w-full card rounded-xl px-4 py-3 text-base mb-4" placeholder="Tu respuesta…">
+      <button id="checkBtn" class="btn-accent w-full rounded-xl py-3 font-semibold disabled:opacity-40" disabled>Comprobar</button>`;
   }
 
   qArea.innerHTML = bodyHtml;
@@ -474,8 +471,11 @@ function renderQuestionArea(){
     document.getElementById('checkBtn').onclick = submitAnswer;
   } else {
     const input = document.getElementById('answerInput');
+    const cb = document.getElementById('checkBtn');
     input.focus();
-    input.onkeydown = (e)=>{ if(e.key==='Enter') submitAnswer(); };
+    input.oninput = ()=>{ cb.disabled = input.value.trim().length===0; };
+    input.onkeydown = (e)=>{ if(e.key==='Enter' && !cb.disabled) submitAnswer(); };
+    cb.onclick = submitAnswer;
   }
 
   renderFeedbackBar(null);
@@ -496,6 +496,8 @@ function submitAnswer(){
       else if(o.dataset.k===sess.pendingChoice) o.classList.add('wrong');
       o.style.pointerEvents='none';
     });
+    const cbSel = document.getElementById('checkBtn');
+    if(cbSel) cbSel.disabled = true;
   } else {
     const val = document.getElementById('answerInput').value.trim();
     userDisplay = val;
@@ -507,18 +509,19 @@ function submitAnswer(){
       isCorrect = similarity(val, q.cloze.word) >= 0.6 || normalize(val)===normalize(q.cloze.word);
     }
     document.getElementById('answerInput').disabled = true;
+    const cb = document.getElementById('checkBtn');
+    if(cb) cb.disabled = true;
   }
 
   sess.answeredCurrent = true;
   sess.answers[sess.index] = {isCorrect, userDisplay};
   if(isCorrect){ sess.correct++; sess.xp += 10; addSubjectResult(q.materia, true); }
-  else { sess.hearts = Math.max(0, sess.hearts-1); addSubjectResult(q.materia, false); }
+  else { addSubjectResult(q.materia, false); }
   stats.xp = (stats.xp||0) + (isCorrect?10:0);
   saveStats(stats);
 
   const segEls = document.querySelectorAll('.gauge-seg');
   if(segEls[sess.index]) segEls[sess.index].classList.add('filled');
-  const hearts = document.querySelectorAll('#app .flex.items-center.gap-2.shrink-0 svg');
 
   renderFeedbackBar(isCorrect, q);
 }
@@ -537,16 +540,17 @@ function renderFeedbackBar(isCorrect, q){
           ${isCorrect? '¡Correcto! +10 XP' : 'Incorrecto'}
         </div>
         ${!isCorrect ? `<div class="text-sm mt-1" style="color:var(--muted)">Respuesta correcta: <b style="color:var(--text)">${q.respuesta_correcta}</b> — ${esc(correctText)}</div>` : ''}
-        <button id="continueBtn" class="btn-accent w-full rounded-xl py-3 font-semibold mt-3">Continuar</button>
+        <button id="continueBtn" disabled class="w-full rounded-xl py-3 font-semibold mt-3 disabled:opacity-50" style="background:var(--text);color:var(--bg)">Continuar →</button>
       </div>
     </div>`;
-  document.getElementById('continueBtn').onclick = nextQuestion;
-  document.getElementById('continueBtn').focus();
+  const contBtn = document.getElementById('continueBtn');
+  contBtn.onclick = nextQuestion;
+  // pequeño retraso para evitar que un doble toque sobre "Comprobar" active "Continuar" por error
+  setTimeout(()=>{ contBtn.disabled = false; contBtn.focus(); }, 350);
 }
 
 function nextQuestion(){
   const sess = state.session;
-  if(sess.hearts<=0){ finishSession(); return; }
   if(sess.index >= sess.questions.length-1){ finishSession(); return; }
   sess.index++;
   sess.answeredCurrent = false;
@@ -619,7 +623,7 @@ function renderResults(){
         let cloze = state.mode==='complete' ? pickClozeWord(q.opciones[q.respuesta_correcta]||'') : null;
         return {...q, optsArr, cloze};
       }),
-      index:0, hearts:5, xp:0, correct:0, answers:{}, startedAt:Date.now(),
+      index:0, xp:0, correct:0, answers:{}, startedAt:Date.now(),
       timeLeft:0, timer:null, answeredCurrent:false
     };
     state.screen='lesson'; render();
