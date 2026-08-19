@@ -294,12 +294,11 @@ function renderHome(){
     const pct = s.total ? Math.round(s.correct/s.total*100) : 0;
     const active = state.selectedSubjects.has(key);
     const div = document.createElement('button');
-    div.className = 'subj-card rounded-xl p-3 text-left flex flex-col gap-2 relative' + (active?' active':'');
+    div.className = 'subj-card rounded-xl p-3 text-left flex flex-col gap-2' + (active?' active':'');
     div.innerHTML = `
-      ${active ? `<div class="absolute top-2 right-2 w-4 h-4 rounded-full flex items-center justify-center" style="background:var(--accent);color:var(--bg)">${ICON.check}</div>` : ''}
       <div class="flex items-start justify-between">
         <span class="text-2xl leading-none">${m.icon}</span>
-        ${!active ? subjectRingSvg(pct,30) : ''}
+        ${subjectRingSvg(pct,30)}
       </div>
       <div>
         <div class="text-sm font-medium leading-tight">${m.label}</div>
